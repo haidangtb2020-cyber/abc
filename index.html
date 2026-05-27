@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Chấm Điểm Phát Âm Tiếng Anh (Giọng Mỹ)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .phrase-box {
+            background-color: #eef2f7;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #0056b3;
+            margin-bottom: 20px;
+            border: 2px dashed #007bff;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #6c757d;
+        }
+        .status {
+            margin-top: 15px;
+            font-style: italic;
+            color: #666;
+        }
+        .result-box {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .text-compare {
+            font-size: 16px;
+            color: #555;
+            line-height: 1.6;
+        }
+        .match { color: #28a745; font-weight: bold; }
+        .mismatch { color: #dc3545; font-weight: bold; text-decoration: line-through; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Luyện Phát Âm Giọng Mỹ 🇺🇸</h1>
+    
+    <p>Hãy đọc câu tiếng Anh dưới đây:</p>
+    <div class="phrase-box" id="targetPhrase">Beautiful day to learn coding</div>
+    
+    <button id="btnListen" onclick="startRecognition()">🎙️ Nhấn và Nói</button>
+    
+    <div class="status" id="statusText">Sẵn sàng. Thay đổi câu mẫu bằng cách gõ vào hộp phía trên nếu muốn!</div>
+    
+    <div class="result-box" id="resultBox">
+        <h3>Kết quả phân tích:</h3>
+        <div class="score" id="scoreValue">0%</div>
+        <div class="text-compare" id="textCompare"></div>
+    </div>
+</div>
+
+<script>
+    // Kiểm tra xem trình duyệt có hỗ trợ Web Speech API không
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        alert("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói. Hãy dùng Google Chrome hoặc Microsoft Edge bản mới nhất.");
+    }
+
+    const recognition = new SpeechRecognition();
+    // Cấu hình nhận diện GIỌNG MỸ (en-US)
+    recognition.lang = 'en-US'; 
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    const btnListen = document.getElementById('btnListen');
+    const statusText = document.getElementById('statusText');
+    const targetPhraseEle = document.getElementById('targetPhrase');
+    const resultBox = document.getElementById('resultBox');
+    const scoreValue = document.getElementById('scoreValue');
+    const textCompare = document.getElementById('textCompare');
+
+    // Cho phép người dùng click vào câu mẫu để đổi câu khác nếu muốn
+    targetPhraseEle.contentEditable = true;
+
+    function startRecognition() {
+        recognition.start();
+        btnListen.disabled = true;
+        btnListen.innerText = "Listening... 🛑";
+        statusText.innerText = "Hệ thống đang nghe, hãy nói to, rõ ràng...";
+        resultBox.style.display = "none";
+    }
+
+    recognition.onresult = function(event) {
+        const spokenText = event.results[0][0].transcript;
+        const targetText = targetPhraseEle.innerText.trim();
+        
+        analyzePronunciation(targetText, spokenText);
+    };
+
+    recognition.onspeechend = function() {
+        recognition.stop();
+        resetButton();
+    };
+
+    recognition.onerror = function(event) {
+        statusText.innerText = "Có lỗi xảy ra: " + event.error;
+        resetButton();
+    };
+
+    function resetButton() {
+        btnListen.disabled = false;
+        btnListen.innerText = "🎙️ Nhấn và Nói";
+    }
+
+    // Hàm chuẩn hóa chuỗi (xóa dấu câu, viết thường) để so sánh chính xác hơn
+    function cleanText(text) {
+        return text.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g,"").replace(/\s{2,}/g," ");
+    }
+
+    // Hàm chấm điểm và so sánh từ ngữ
+    function analyzePronunciation(target, spoken) {
+        const cleanTarget = cleanText(target);
+        const cleanSpoken = cleanText(spoken);
+
+        const targetWords = cleanTarget.split(' ');
+        const spokenWords = cleanSpoken.split(' ');
+
+        let correctCount = 0;
+        let htmlCompare = "";
+
+        // So sánh từng từ (Thuật toán cơ bản)
+        targetWords.forEach((word) => {
+            if (spokenWords.includes(word)) {
+                correctCount++;
+                htmlCompare += `<span class="match">${word}</span> `;
+            } else {
+                htmlCompare += `<span class="mismatch">${word}</span> `;
+            }
+        });
+
+        // Tính phần trăm điểm số
+        const scorePercentage = Math.round((correctCount / targetWords.length) * 100);
+
+        // Hiển thị kết quả
+        resultBox.style.display = "block";
+        scoreValue.innerText = scorePercentage + "%";
+        
+        if (scorePercentage >= 80) {
+            scoreValue.style.color = "#28a745"; // Xanh lá nếu phát âm tốt
+            statusText.innerText = "Tuyệt vời! Giọng bạn rất chuẩn.";
+        } else if (scorePercentage >= 50) {
+            scoreValue.style.color = "#ffc107"; // Vàng nếu tạm ổn
+            statusText.innerText = "Khá tốt, nhưng cần chú ý các từ bị gạch đỏ.";
+        } else {
+            scoreValue.style.color = "#dc3545"; // Đỏ nếu chưa đạt
+            statusText.innerText = "Thử lại lần nữa xem sao nhé!";
+        }
+
+        textCompare.innerHTML = `<p><b>Bạn đã nói:</b> "<i>${spoken}</i>"</p>` + 
+                               `<p><b>Từ chuẩn / Lỗi:</b> ${htmlCompare}</p>`;
+    }
+</script>
+
+</body>
+</html>
